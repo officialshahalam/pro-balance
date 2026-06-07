@@ -1,0 +1,159 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── Enums ───────────────────────────────────────────────
+
+enum StatementType {
+  BALANCE_SHEET
+  PROFIT_LOSS
+}
+
+enum AnnexureType {
+  key_value
+  depreciation_schedule
+  ledger
+}
+
+// ─── User (CA) ───────────────────────────────────────────
+
+model User {
+  id                     Int      @id @default(autoincrement())
+  email                  String   @unique
+  name                   String
+  password_hash          String
+  ca_firm_name           String?
+  ca_registration_number String?
+  ca_place               String?
+  created_at             DateTime @default(now())
+  updated_at             DateTime @updatedAt
+
+  clients Client[]
+}
+
+// ─── Client ──────────────────────────────────────────────
+
+model Client {
+  id              Int      @id @default(autoincrement())
+  user_id         Int
+  name            String
+  firm_type       String?
+  pan             String?
+  gstin           String?
+  phone           String?
+  email           String?
+  address_line    String?
+  village         String?
+  post_office     String?
+  city            String?
+  state           String?
+  pin_code        String?
+  proprietor_name String?
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  user            User            @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  financial_years FinancialYear[]
+
+  @@index([user_id])
+}
+
+// ─── Financial Year ──────────────────────────────────────
+
+model FinancialYear {
+  id             Int       @id @default(autoincrement())
+  client_id      Int
+  label          String
+  start_date     DateTime
+  end_date       DateTime
+  is_finalized   Boolean   @default(false)
+  finalized_at   DateTime?
+  source_fy_id   Int?
+  growth_percent Float?
+  created_at     DateTime  @default(now())
+  updated_at     DateTime  @updatedAt
+
+  client          Client          @relation(fields: [client_id], references: [id], onDelete: Cascade)
+  source_fy       FinancialYear?  @relation("FYProjection", fields: [source_fy_id], references: [id])
+  projected_fys   FinancialYear[] @relation("FYProjection")
+  statement_lines StatementLine[]
+  annexures       Annexure[]
+
+  @@unique([client_id, label])
+  @@index([client_id])
+}
+
+// ─── Statement Line ──────────────────────────────────────
+// Every visible row in Balance Sheet or P&L = one row here.
+// Static rows:  slot_key set, label null  (label hardcoded in frontend)
+// Dynamic rows: slot_key null, label set  (user typed via + Add)
+// Subtotals / Totals / Headers: NEVER stored — computed by frontend
+
+// Balance Sheet sections:
+//   liab_owners_funds   → Owners' Capital Account (slot: owners_capital), Reserves & Surplus (slot: reserves_surplus)
+//   liab_non_current    → Long-term borrowings (lt_borrowings), Deferred tax liab (deferred_tax_liab),
+//                         Other long-term liab (other_lt_liab), Long-term provisions (lt_provisions), + dynamic rows
+//   liab_current        → Short-term borrowings (st_borrowings), Trade payables (trade_payables),
+//                         Other current liab (other_current_liab), Short-term provisions (st_provisions), + dynamic rows
+//   asset_non_current   → Fixed Assets (fixed_assets), PPE (ppe_intangible), Non-current investments (nc_investments),
+//                         Deferred tax asset (deferred_tax_asset), LT Loans & Advances (lt_loans_advances),
+//                         Other non-current assets (other_nc_assets), + dynamic rows
+//   asset_current       → Current investments (current_investments), Inventories (inventories),
+//                         Trade receivables (trade_receivables), Cash & bank (cash_bank),
+//                         ST Loans & Advances (st_loans_advances), Other current assets (other_current_assets),
+//                         + dynamic rows
+//
+// P&L sections:
+//   trading_debit         → Opening Stock (slot: opening_stock), Purchases (slot: purchases)
+//   trading_debit_direct  → Direct Expenses — all dynamic (Wages, Freight, etc.)
+//   trading_credit        → By Sales (slot: sales), By Closing Stock (slot: closing_stock)
+//   trading_credit_other  → Other trading income — all dynamic
+//   pl_debit_indirect     → Indirect Expenses — all dynamic (Depreciation, Audit fees, etc.)
+//   pl_credit_other       → P&L other income — all dynamic (Interest received, Rental income, etc.)
+
+model StatementLine {
+  id                Int           @id @default(autoincrement())
+  financial_year_id Int
+  statement_type    StatementType
+  section           String
+  slot_key          String?
+  label             String?
+  amount            Decimal       @default(0) @db.Decimal(15, 2)
+  annexure_ref      String?
+  is_dynamic        Boolean       @default(false)
+  sort_order        Int           @default(0)
+  created_at        DateTime      @default(now())
+  updated_at        DateTime      @updatedAt
+
+  financial_year FinancialYear @relation(fields: [financial_year_id], references: [id], onDelete: Cascade)
+
+  @@unique([financial_year_id, statement_type, section, slot_key])
+  @@index([financial_year_id, statement_type])
+  @@index([financial_year_id, statement_type, section])
+}
+
+// ─── Annexure ────────────────────────────────────────────
+// Detail schedule behind each BS/P&L line (Ann. A, B, C...)
+// Linked from StatementLine.annexure_ref
+// JSON data kept — structure varies by ann_type
+
+model Annexure {
+  id                Int          @id @default(autoincrement())
+  financial_year_id Int
+  ref_code          String
+  title             String
+  ann_type          AnnexureType @default(key_value)
+  data              Json
+  created_at        DateTime     @default(now())
+  updated_at        DateTime     @updatedAt
+
+  financial_year FinancialYear @relation(fields: [financial_year_id], references: [id], onDelete: Cascade)
+
+  @@unique([financial_year_id, ref_code])
+  @@index([financial_year_id])
+}

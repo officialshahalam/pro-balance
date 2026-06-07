@@ -1,0 +1,66 @@
+version: "3.8"
+
+services:
+  webvirtus-app:
+    image: aalam855/webvirtus-backend:latest
+    container_name: webvirtus
+    ports:
+      - "4000:4000"
+    env_file:
+      - .env
+    depends_on:
+      - zookeeper
+      - kafka
+      - redis
+    restart: unless-stopped
+    networks:
+      - webvirtus-net
+
+  postgres:
+    image: postgres:15
+    container_name: postgres-demo-db
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: user1234
+      POSTGRES_DB: demo_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/libpostgresql/data
+
+  redis:
+    image: redis/redis-stack:latest
+    restart: unless-stopped
+    networks:
+      - webvirtus-net
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.4.0
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    restart: unless-stopped
+    networks:
+      - webvirtus-net
+
+  kafka:
+    image: confluentinc/cp-kafka:7.4.0
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    restart: unless-stopped
+    networks:
+      - webvirtus-net
+
+volumns:
+  pgdata:
+
+networks:
+  webvirtus-net:
+    driver: bridge

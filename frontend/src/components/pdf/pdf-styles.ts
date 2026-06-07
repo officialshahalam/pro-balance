@@ -1,0 +1,50 @@
+import { StyleSheet } from "@react-pdf/renderer";
+
+export const styles = StyleSheet.create({
+  page: { padding: 40, fontSize: 9, fontFamily: "Helvetica" },
+  headerCenter: { textAlign: "center", marginBottom: 16 },
+  firmName: { fontSize: 12, fontFamily: "Helvetica-Bold", textDecoration: "underline", marginBottom: 2 },
+  reportTitle: { fontSize: 10, fontFamily: "Helvetica-Bold", textDecoration: "underline", marginBottom: 2 },
+  address: { fontSize: 8, fontFamily: "Helvetica-Bold", marginBottom: 8 },
+  row: { flexDirection: "row" },
+  col: { flex: 1 },
+  colBorder: { flex: 1, borderRightWidth: 0.5, borderRightColor: "#000" },
+  thRow: { flexDirection: "row", borderBottomWidth: 1, borderBottomColor: "#000", paddingBottom: 3, marginBottom: 4 },
+  thText: { fontFamily: "Helvetica-Bold", fontSize: 9 },
+  thAmount: { fontFamily: "Helvetica-Bold", fontSize: 9, textAlign: "right", width: 100 },
+  sectionHeader: { fontFamily: "Helvetica-Bold", textDecoration: "underline", fontSize: 9, marginTop: 6, marginBottom: 3 },
+  subHeader: { fontFamily: "Helvetica-BoldOblique", fontSize: 9, marginTop: 4, marginBottom: 2 },
+  itemRow: { flexDirection: "row", marginBottom: 1.5 },
+  itemText: { flex: 1, fontSize: 8.5 },
+  itemAmount: { width: 100, textAlign: "right", fontSize: 8.5, fontFamily: "Helvetica" },
+  totalRow: { flexDirection: "row", borderTopWidth: 1.5, borderTopColor: "#000", paddingTop: 3, marginTop: 6 },
+  totalRowDouble: { flexDirection: "row", borderTopWidth: 1.5, borderBottomWidth: 2, borderColor: "#000", paddingTop: 3, paddingBottom: 2, marginTop: 6 },
+  totalText: { flex: 1, fontFamily: "Helvetica-Bold", fontSize: 9.5 },
+  totalAmount: { width: 100, textAlign: "right", fontFamily: "Helvetica-Bold", fontSize: 9.5 },
+  subtotalRow: { flexDirection: "row", borderTopWidth: 0.5, borderTopColor: "#000", paddingTop: 2, marginTop: 3, marginBottom: 3 },
+  subtotalAmount: { width: 100, textAlign: "right", fontFamily: "Helvetica-Bold", fontSize: 8.5 },
+  auditorSection: { marginTop: 20, textAlign: "center", fontSize: 8.5, fontFamily: "Helvetica-Bold" },
+  auditorSubtext: { fontSize: 8, fontFamily: "Helvetica", textAlign: "center", marginTop: 2 },
+  footerRow: { flexDirection: "row", justifyContent: "space-between", marginTop: 30 },
+  footerLeft: { fontSize: 8 },
+  footerRight: { fontSize: 8, textAlign: "right" },
+  footerBold: { fontFamily: "Helvetica-Bold", fontSize: 8.5 },
+  // Annexure styles
+  annexureTitle: { fontSize: 10, fontFamily: "Helvetica-Bold", textDecoration: "underline", textAlign: "center", marginBottom: 8 },
+  annexureLabel: { fontSize: 9, fontFamily: "Helvetica-Bold", marginBottom: 4 },
+  tableHeader: { flexDirection: "row", borderBottomWidth: 1, borderBottomColor: "#000", paddingBottom: 3, marginBottom: 2 },
+  tableCell: { fontSize: 8.5 },
+  tableCellBold: { fontSize: 8.5, fontFamily: "Helvetica-Bold" },
+  tableCellRight: { fontSize: 8.5, textAlign: "right" },
+  tableRow: { flexDirection: "row", marginBottom: 1.5, paddingVertical: 1 },
+  tableTotalRow: { flexDirection: "row", borderTopWidth: 1.5, borderBottomWidth: 2, borderColor: "#000", paddingTop: 3, paddingBottom: 2, marginTop: 4 },
+  snoCol: { width: 35 },
+  partCol: { flex: 1 },
+  amtCol: { width: 100, textAlign: "right" },
+  rateCol: { width: 40, textAlign: "right" },
+  depCol: { width: 85, textAlign: "right" },
+});
+
+export function fmtInr(n: number): string {
+  return n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}

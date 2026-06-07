@@ -1,0 +1,1 @@
+ALTER TABLE "FixedAsset" ALTER COLUMN "category" DROP NOT NULL;
