@@ -105,10 +105,12 @@ authRouter.post(
 		try {
 			const { user, token } = await login(req.body);
 
+			const isProd = process.env.NODE_ENV === "production";
 			res.cookie("access_token", token, {
 				httpOnly: true,
-				secure: process.env.NODE_ENV === "production",
-				sameSite: "lax",
+				secure: isProd,
+				// "none" allows the cookie cross-site (Vercel frontend ↔ Railway API); requires secure.
+				sameSite: isProd ? "none" : "lax",
 				maxAge: 24 * 60 * 60 * 1000, // match the 24h token expiry
 			});
 
@@ -137,7 +139,13 @@ authRouter.post(
 authRouter.post(
 	"/logout",
 	(_req: Request, res: Response): void => {
-		res.clearCookie("access_token");
+		const isProd = process.env.NODE_ENV === "production";
+		// Options must match those used when setting the cookie, or the browser won't clear it.
+		res.clearCookie("access_token", {
+			httpOnly: true,
+			secure: isProd,
+			sameSite: isProd ? "none" : "lax",
+		});
 		res.status(200).json({ status: "success", message: "Logged out successfully" });
 	},
 );
