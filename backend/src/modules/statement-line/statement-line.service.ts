@@ -178,56 +178,58 @@ export const bulkUpsertLines = async (
 ) => {
 	await verifyFYOwnership(fyId, userId);
 
-	// Delete all dynamic rows first so the save is a full sync (removed rows disappear from DB)
-	await prisma.statementLine.deleteMany({
-		where: { financial_year_id: fyId, statement_type: statementType, is_dynamic: true },
-	});
-
+	// deleteMany + all line ops in one atomic transaction — if any op fails, rows are NOT deleted
 	await prisma.$transaction(
-		lines.map((line) => {
-			if (line.id) {
-				return prisma.statementLine.update({
-					where: { id: line.id },
-					data: { amount: line.amount, annexure_ref: line.annexure_ref ?? null },
-				});
-			}
-			if (!line.is_dynamic && line.slot_key) {
-				return prisma.statementLine.upsert({
-					where: {
-						financial_year_id_statement_type_section_slot_key: {
+		[
+			prisma.statementLine.deleteMany({
+				where: { financial_year_id: fyId, statement_type: statementType, is_dynamic: true },
+			}),
+			...lines.map((line) => {
+				if (line.id) {
+					return prisma.statementLine.update({
+						where: { id: line.id },
+						data: { amount: line.amount, annexure_ref: line.annexure_ref ?? null },
+					});
+				}
+				if (!line.is_dynamic && line.slot_key) {
+					return prisma.statementLine.upsert({
+						where: {
+							financial_year_id_statement_type_section_slot_key: {
+								financial_year_id: fyId,
+								statement_type: statementType,
+								section: line.section,
+								slot_key: line.slot_key,
+							},
+						},
+						create: {
 							financial_year_id: fyId,
 							statement_type: statementType,
 							section: line.section,
 							slot_key: line.slot_key,
+							amount: line.amount,
+							annexure_ref: line.annexure_ref ?? null,
+							is_dynamic: false,
+							sort_order: line.sort_order,
 						},
-					},
-					create: {
+						update: { amount: line.amount, annexure_ref: line.annexure_ref ?? null },
+					});
+				}
+				return prisma.statementLine.create({
+					data: {
 						financial_year_id: fyId,
 						statement_type: statementType,
 						section: line.section,
-						slot_key: line.slot_key,
+						slot_key: null,
+						label: line.label?.trim() ?? null,
 						amount: line.amount,
 						annexure_ref: line.annexure_ref ?? null,
-						is_dynamic: false,
+						is_dynamic: true,
 						sort_order: line.sort_order,
 					},
-					update: { amount: line.amount, annexure_ref: line.annexure_ref ?? null },
 				});
-			}
-			return prisma.statementLine.create({
-				data: {
-					financial_year_id: fyId,
-					statement_type: statementType,
-					section: line.section,
-					slot_key: null,
-					label: line.label?.trim() ?? null,
-					amount: line.amount,
-					annexure_ref: line.annexure_ref ?? null,
-					is_dynamic: true,
-					sort_order: line.sort_order,
-				},
-			});
-		}),
+			}),
+		],
+		{ timeout: 30_000 },
 	);
 
 	return prisma.statementLine.findMany({

@@ -20,7 +20,7 @@ export default function LoginPage() {
     setLoading(true);
     const fd = new FormData(e.currentTarget);
     try {
-      const { user, token } = await loginApi({
+      const { user } = await loginApi({
         email: fd.get("email") as string,
         password: fd.get("password") as string,
       });

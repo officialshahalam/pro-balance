@@ -34,11 +34,11 @@ export const defaultDirectExpenses: PLItem[] = [
 ];
 
 export const defaultIndirectExpenses: PLItem[] = [
-  { id: "ie_1", label: "Salary Expenses", amount: 0 },
-  { id: "ie_2", label: "Rent Expenses", amount: 0 },
-  { id: "ie_3", label: "Electricity Expenses", amount: 0 },
-  { id: "ie_4", label: "Bank Charges", amount: 0 },
-  { id: "ie_5", label: "Depreciation", amount: 0, hasAnnexure: true },
+  { id: "ie_1", label: "Depreciation", amount: 0, hasAnnexure: true },
+  { id: "ie_2", label: "Salary Expenses", amount: 0 },
+  { id: "ie_3", label: "Rent Expenses", amount: 0 },
+  { id: "ie_4", label: "Electricity Expenses", amount: 0 },
+  { id: "ie_5", label: "Bank Charges", amount: 0 },
 ];
 
 export function getDefaultPLData(): PLData {

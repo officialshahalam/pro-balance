@@ -2,6 +2,8 @@ import { Page, View, Text } from "@react-pdf/renderer";
 import { styles, fmtInr } from "./pdf-styles";
 import type { AnnexureData } from "@/lib/api-client/statements";
 
+const roundHD = (n: number) => Math.ceil(n - 0.5);
+
 function compute(item: any) {
   const rate = parseFloat(item.rate) || 0;
   const wdv = parseFloat(item.wdv_opening) || 0;
@@ -9,8 +11,8 @@ function compute(item: any) {
   const addAfter = parseFloat(item.addition_after) || 0;
   const sold = parseFloat(item.sold_transfer) || 0;
   const total = wdv + addUpto + addAfter - sold;
-  const depreciation = (wdv + addUpto) * rate / 100 + addAfter * rate / 200;
-  const wdv_closing = total - depreciation;
+  const depreciation = roundHD((wdv + addUpto) * rate / 100 + addAfter * rate / 200);
+  const wdv_closing = roundHD(total - depreciation);
   return { total, depreciation, wdv_closing };
 }
 
@@ -49,13 +51,15 @@ function KeyValueAnnexure({ annexure, client, fy }: { annexure: AnnexureData; cl
   );
 }
 
-function LedgerAnnexure({ annexure, client, fy }: { annexure: AnnexureData; client: any; fy: any }) {
+function LedgerAnnexure({ annexure, client, fy, netProfit }: { annexure: AnnexureData; client: any; fy: any; netProfit?: number }) {
   const debit = annexure.data?.debit ?? [];
   const credit = annexure.data?.credit ?? [];
   const debitTotal = debit.reduce((s: number, i: any) => s + (i.amount ?? 0), 0);
   const creditTotal = credit.reduce((s: number, i: any) => s + (i.amount ?? 0), 0);
-  const balanceCd = Math.max(0, creditTotal - debitTotal);
-  const grandTotal = creditTotal;
+  const npAmt = netProfit ?? 0;
+  const adjustedCreditTotal = creditTotal + npAmt;
+  const balanceCd = Math.max(0, adjustedCreditTotal - debitTotal);
+  const grandTotal = adjustedCreditTotal;
   const endDate = new Date(fy.end_date);
   const dateStr = `${String(endDate.getDate()).padStart(2, "0")}.${String(endDate.getMonth() + 1).padStart(2, "0")}.${endDate.getFullYear()}`;
 
@@ -98,6 +102,14 @@ function LedgerAnnexure({ annexure, client, fy }: { annexure: AnnexureData; clie
               <Text style={[styles.tableCellRight, styles.amtCol]}>{fmtInr(item.amount ?? 0)}</Text>
             </View>
           ))}
+          {netProfit !== undefined && (
+            <View style={styles.tableRow}>
+              <Text style={[styles.tableCell, styles.partCol, { fontStyle: "italic" }]}>
+                {`By Net ${netProfit >= 0 ? "Profit" : "Loss"}`}
+              </Text>
+              <Text style={[styles.tableCellRight, styles.amtCol]}>{fmtInr(Math.abs(netProfit))}</Text>
+            </View>
+          )}
           <View style={[styles.tableTotalRow, { marginTop: "auto" }]}>
             <Text style={[styles.tableCellBold, styles.partCol]}>TOTAL</Text>
             <Text style={[styles.tableCellBold, styles.amtCol, { textAlign: "right" }]}>{fmtInr(grandTotal)}</Text>
@@ -183,16 +195,21 @@ function DepreciationAnnexure({ annexure, client, fy }: { annexure: AnnexureData
   );
 }
 
-export default function AnnexurePages({ annexures, client, fy }: {
+export default function AnnexurePages({ annexures, client, fy, netProfit, capitalAccountRef }: {
   annexures: AnnexureData[];
   client: any;
   fy: any;
+  netProfit?: number;
+  capitalAccountRef?: string;
 }) {
   if (!annexures.length) return null;
   return (
     <Page size="A4" style={styles.page} wrap>
       {annexures.map((ann) => {
-        if (ann.ann_type === "ledger") return <LedgerAnnexure key={ann.id} annexure={ann} client={client} fy={fy} />;
+        if (ann.ann_type === "ledger") {
+          const isCapital = capitalAccountRef && ann.ref_code === capitalAccountRef;
+          return <LedgerAnnexure key={ann.id} annexure={ann} client={client} fy={fy} netProfit={isCapital ? netProfit : undefined} />;
+        }
         if (ann.ann_type === "depreciation_schedule") return <DepreciationAnnexure key={ann.id} annexure={ann} client={client} fy={fy} />;
         return <KeyValueAnnexure key={ann.id} annexure={ann} client={client} fy={fy} />;
       })}

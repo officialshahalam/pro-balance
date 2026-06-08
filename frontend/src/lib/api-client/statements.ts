@@ -45,12 +45,14 @@ const LIAB_ID_TO_DB_SECTION: Record<string, string> = {
 const ASSET_ID_TO_SLOT: Record<string, string> = {
   "1a0": "fixed_assets",         "1a": "ppe_intangible",    "1b": "nc_investments",
   "1c":  "deferred_tax_asset",   "1d": "lt_loans_advances", "1e": "other_nc_assets",
+  "2cs": "closing_stock",
   "2a":  "current_investments",  "2b": "inventories",       "2c": "trade_receivables",
   "2d":  "cash_bank",            "2e": "st_loans_advances", "2f": "other_current_assets",
 };
 const ASSET_ID_TO_DB_SECTION: Record<string, string> = {
   "1a0": "asset_non_current", "1a": "asset_non_current", "1b": "asset_non_current",
   "1c":  "asset_non_current", "1d": "asset_non_current", "1e": "asset_non_current",
+  "2cs": "asset_current",
   "2a":  "asset_current",     "2b": "asset_current",     "2c": "asset_current",
   "2d":  "asset_current",     "2e": "asset_current",     "2f": "asset_current",
 };

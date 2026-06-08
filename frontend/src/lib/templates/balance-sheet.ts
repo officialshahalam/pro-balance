@@ -49,6 +49,7 @@ export const assetsTemplate: BSRow[] = [
   { id: "1_add", label: "Add", type: "add_button", section: "1" },
   { id: "1_sub", label: "", type: "subtotal" },
   { id: "2", label: "Current assets", type: "subheader" },
+  { id: "2cs", label: "Closing Stock", type: "item", indent: 1, section: "2" },
   { id: "2a", label: "Current investments", type: "item", indent: 1, section: "2" },
   { id: "2b", label: "Inventories", type: "item", indent: 1, section: "2" },
   { id: "2c", label: "Trade receivables", type: "item", indent: 1, section: "2" },
