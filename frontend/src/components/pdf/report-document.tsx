@@ -8,7 +8,7 @@ import type { AnnexureData } from "@/lib/api-client/statements";
 
 type AnnMap = Record<string, { ref_code: string; total: number; depreciation?: number }>;
 
-export default function ReportDocument({ client, user, fy, bsData, plData, annexures, annexureMap, reportType }: {
+export default function ReportDocument({ client, user, fy, bsData, plData, annexures, annexureMap, reportType, netProfit, capitalAccountRef }: {
   client: any;
   user: any;
   fy: any;
@@ -17,12 +17,14 @@ export default function ReportDocument({ client, user, fy, bsData, plData, annex
   annexures: AnnexureData[];
   annexureMap: AnnMap;
   reportType: string;
+  netProfit?: number;
+  capitalAccountRef?: string;
 }) {
   return (
     <Document>
       <BSPage client={client} user={user} fy={fy} liabilities={bsData.liabilities} assets={bsData.assets} annexureMap={annexureMap} reportType={reportType} />
       <PLPage client={client} user={user} fy={fy} data={plData} annexureMap={annexureMap} reportType={reportType} />
-      <AnnexurePages annexures={annexures} client={client} fy={fy} />
+      <AnnexurePages annexures={annexures} client={client} fy={fy} netProfit={netProfit} capitalAccountRef={capitalAccountRef} />
     </Document>
   );
 }

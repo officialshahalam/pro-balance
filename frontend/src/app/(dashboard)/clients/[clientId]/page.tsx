@@ -6,6 +6,7 @@ import { getFinancialYears, deleteFinancialYear, createFinancialYear } from "@/l
 import { getStatement, saveStatement, getAnnexures, createAnnexure, updateAnnexure, deleteAnnexure, projectFY, reProjectFY, type AnnexureData } from "@/lib/api-client/statements";
 import { getDefaultBSData, type BSRow, DYNAMIC_SECTIONS } from "@/lib/templates/balance-sheet";
 import { getDefaultPLData, type PLData } from "@/lib/templates/profit-loss";
+import { buildAnnexureMap, computeNetProfit, getCapitalAccountRef, enrichAnnexureMap } from "@/lib/financial/compute";
 import BSTable from "@/components/financial/bs-table";
 import PLTable from "@/components/financial/pl-table";
 import AnnexureEditor from "@/components/financial/annexure-editor";
@@ -18,9 +19,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { ArrowLeft, Save, TrendingUp, Plus, FileDown } from "lucide-react";
 import { useAuthStore } from "@/stores/auth-store";
 import { useRef } from "react";
+import { useRouter } from "next/navigation";
 import { confirm } from "@/components/ui/confirm-dialog";
 import { toast } from "sonner";
-import Link from "next/link";
 
 type Tab = "bs" | "pl" | "annexures";
 type LocalAnnexure = AnnexureData & { _isNew?: boolean };
@@ -31,6 +32,7 @@ export default function ClientFinancialPage({ params }: { params: Promise<{ clie
   const { clientId } = use(params);
   const cid = Number(clientId);
   const qc = useQueryClient();
+  const router = useRouter();
 
   const { user } = useAuthStore();
   const { data: client } = useQuery({ queryKey: ["client", cid], queryFn: () => getClient(cid) });
@@ -75,6 +77,8 @@ export default function ClientFinancialPage({ params }: { params: Promise<{ clie
   // Projection
   const [projOpen, setProjOpen] = useState(false);
   const [growthPercent, setGrowthPercent] = useState("");
+  const [isProjecting, setIsProjecting] = useState(false);
+  const isProjectingRef = useRef(false);
 
   // Adjust growth
   const [adjustOpen, setAdjustOpen] = useState(false);
@@ -150,6 +154,9 @@ export default function ClientFinancialPage({ params }: { params: Promise<{ clie
       const fixedAssets: BSRow = { id: "1a0", label: "Fixed Assets", type: "item", indent: 1, section: "1", amount: 0 };
       if (subheaderIdx !== -1) result.splice(subheaderIdx + 1, 0, fixedAssets);
     }
+    // Closing Stock is now a fixed (static) row sourced from the P&L — drop any legacy
+    // user-added "Closing Stock" dynamic row (the static "2cs" row from the template replaces it).
+    result = result.filter((r) => !(r.isDynamic && (r.label ?? "").trim().toLowerCase() === "closing stock"));
     return result;
   };
 
@@ -215,7 +222,7 @@ export default function ClientFinancialPage({ params }: { params: Promise<{ clie
   });
 
   useEffect(() => {
-    let data = bsRaw ?? (selectedFyId ? getDefaultBSData() : null);
+    let data = (bsRaw as { liabilities: BSRow[]; assets: BSRow[] } | null) ?? (selectedFyId ? getDefaultBSData() : null);
     if (data) {
       data = {
         liabilities: ensureAddButtons(normalizeSections(data.liabilities, "liabilities"), "liabilities"),
@@ -227,7 +234,7 @@ export default function ClientFinancialPage({ params }: { params: Promise<{ clie
   }, [bsRaw, selectedFyId]);
 
   useEffect(() => {
-    const data = plRaw ?? (selectedFyId ? getDefaultPLData() : null);
+    const data = (plRaw as PLData | null) ?? (selectedFyId ? getDefaultPLData() : null);
     setPlData(data);
     serverPlRef.current = JSON.stringify(data);
   }, [plRaw, selectedFyId]);
@@ -236,6 +243,45 @@ export default function ClientFinancialPage({ params }: { params: Promise<{ clie
     const data = annexuresRaw ?? [];
     setLocalAnnexures(data);
     serverAnnRef.current = JSON.stringify(data);
+
+    const capitalAnn = data.find((a: any) => a.ann_type === "ledger");
+    const faAnn = data.find((a: any) => a.ann_type === "depreciation_schedule");
+
+    setBsData((prev) => {
+      if (!prev) return prev;
+      let changed = false;
+      let liabilities = prev.liabilities;
+      let assets = prev.assets;
+      if (capitalAnn) {
+        const row = liabilities.find((r) => r.id === "1a");
+        if (row && !row.annexure_ref) {
+          liabilities = liabilities.map((r) => r.id === "1a" ? { ...r, annexure_ref: capitalAnn.ref_code } : r);
+          changed = true;
+        }
+      }
+      if (faAnn) {
+        const row = assets.find((r) => r.id === "1a0");
+        if (row && !row.annexure_ref) {
+          assets = assets.map((r) => r.id === "1a0" ? { ...r, annexure_ref: faAnn.ref_code } : r);
+          changed = true;
+        }
+      }
+      if (!changed) return prev;
+      const next = { ...prev, liabilities, assets };
+      serverBsRef.current = JSON.stringify(next);
+      return next;
+    });
+
+    setPlData((prev) => {
+      if (!prev || !faAnn) return prev;
+      const dep = (prev as any)?.pl?.indirect_expenses?.find((e: any) => e.label === "Depreciation");
+      if (!dep || dep.annexure_ref) return prev;
+      const next = JSON.parse(JSON.stringify(prev));
+      const depItem = (next as any)?.pl?.indirect_expenses?.find((e: any) => e.label === "Depreciation");
+      if (depItem) depItem.annexure_ref = faAnn.ref_code;
+      serverPlRef.current = JSON.stringify(next);
+      return next;
+    });
   }, [annexuresRaw]);
 
   // Per-sheet dirty tracking
@@ -255,23 +301,23 @@ export default function ClientFinancialPage({ params }: { params: Promise<{ clie
   const pendingActionRef = useRef<(() => void) | null>(null);
 
   const guardedAction = (action: () => void) => {
-    if (!currentDirty) { action(); return; }
+    if (!isBsDirty && !isPlDirty) { action(); return; }
     pendingActionRef.current = action;
     setUnsavedOpen(true);
   };
 
   const handleUnsavedSave = async () => {
     setUnsavedOpen(false);
-    if (tab === "bs") await saveBs();
-    else if (tab === "pl") await savePl();
+    if (isBsDirty) await saveBs();
+    if (isPlDirty) await savePl();
     pendingActionRef.current?.();
     pendingActionRef.current = null;
   };
 
   const handleUnsavedDiscard = () => {
     setUnsavedOpen(false);
-    if (tab === "bs") setBsData(JSON.parse(serverBsRef.current || "null"));
-    else if (tab === "pl") setPlData(JSON.parse(serverPlRef.current || "null"));
+    if (isBsDirty) setBsData(JSON.parse(serverBsRef.current || "null"));
+    if (isPlDirty) setPlData(JSON.parse(serverPlRef.current || "null"));
     pendingActionRef.current?.();
     pendingActionRef.current = null;
   };
@@ -282,36 +328,38 @@ export default function ClientFinancialPage({ params }: { params: Promise<{ clie
   };
 
   // Annexure map for cross-referencing
-  const annexureMap = useMemo(() => {
-    const map: Record<string, { ref_code: string; total: number; depreciation?: number }> = {};
-    localAnnexures.forEach((ann) => {
-      if (ann.ann_type === "depreciation_schedule") {
-        const items = ann.data?.items ?? [];
-        let wdvTotal = 0, depTotal = 0;
-        items.forEach((i: any) => {
-          const rate = parseFloat(i.rate) || 0;
-          const wdv = parseFloat(i.wdv_opening) || 0;
-          const addUpto = parseFloat(i.addition_upto) || 0;
-          const addAfter = parseFloat(i.addition_after) || 0;
-          const sold = parseFloat(i.sold_transfer) || 0;
-          const total = wdv + addUpto + addAfter - sold;
-          const dep = Math.ceil((wdv + addUpto) * rate / 100 + addAfter * rate / 200 - 0.5);
-          const wdvClosing = Math.ceil(total - dep - 0.5);
-          wdvTotal += wdvClosing;
-          depTotal += dep;
-        });
-        map[ann.ref_code] = { ref_code: ann.ref_code, total: wdvTotal, depreciation: depTotal };
-      } else if (ann.ann_type === "ledger") {
-        const creditTotal = (ann.data?.credit ?? []).reduce((s: number, i: any) => s + (i.amount ?? 0), 0);
-        const debitTotal = (ann.data?.debit ?? []).reduce((s: number, i: any) => s + (i.amount ?? 0), 0);
-        map[ann.ref_code] = { ref_code: ann.ref_code, total: Math.max(0, creditTotal - debitTotal) };
-      } else {
-        const total = (ann.data?.items ?? []).reduce((s: number, i: any) => s + (i.amount ?? 0), 0);
-        map[ann.ref_code] = { ref_code: ann.ref_code, total };
-      }
+  const annexureMap = useMemo(() => buildAnnexureMap(localAnnexures), [localAnnexures]);
+
+  // Current year net profit (same formula as pl-table.tsx)
+  const netProfit = useMemo(() => computeNetProfit(plData, annexureMap), [plData, annexureMap]);
+
+  const capitalAccountRef = useMemo(() => getCapitalAccountRef(bsData), [bsData]);
+
+  const enrichedAnnexureMap = useMemo(
+    () => enrichAnnexureMap(annexureMap, capitalAccountRef, netProfit),
+    [annexureMap, capitalAccountRef, netProfit]
+  );
+
+  // BS Closing Stock ("2cs") is read-only and always equals the P&L closing stock.
+  const closingStock = useMemo(() => {
+    const cs: any = plData?.trading?.credit?.closing_stock;
+    if (!cs) return 0;
+    if (cs.annexure_ref && annexureMap[cs.annexure_ref]) {
+      const ann = annexureMap[cs.annexure_ref];
+      return ann.depreciation !== undefined ? ann.depreciation : ann.total;
+    }
+    return cs.amount ?? 0;
+  }, [plData, annexureMap]);
+
+  // Keep the BS Closing Stock row in sync with the P&L value.
+  useEffect(() => {
+    setBsData((prev) => {
+      if (!prev) return prev;
+      const row = prev.assets.find((r) => r.id === "2cs");
+      if (!row || (row.amount ?? 0) === closingStock) return prev;
+      return { ...prev, assets: prev.assets.map((r) => r.id === "2cs" ? { ...r, amount: closingStock } : r) };
     });
-    return map;
-  }, [localAnnexures]);
+  }, [closingStock]);
 
   // Get next available ref code
   const getNextRefCode = () => {
@@ -383,11 +431,11 @@ export default function ClientFinancialPage({ params }: { params: Promise<{ clie
   // Update local annexure data
   // Save annexure to DB → redirect back to source sheet → mark sheet dirty
   const handleSaveAnnexure = async (id: number, data: { items: { name: string; amount: number }[] }) => {
-    // Update local state first
     setLocalAnnexures((prev) => prev.map((a) => a.id === id ? { ...a, data } : a));
 
     if (!selectedFyId) return;
     const ann = localAnnexures.find((a) => a.id === id);
+    setSavingAnnexureId(id);
     try {
       if (ann && (ann._isNew || ann.id < 0)) {
         await createAnnexure(selectedFyId, { title: ann.title, ann_type: ann.ann_type, data });
@@ -397,7 +445,6 @@ export default function ClientFinancialPage({ params }: { params: Promise<{ clie
       qc.invalidateQueries({ queryKey: ["annexures", selectedFyId] });
       toast.success(`Annexure ${ann?.ref_code} saved`);
 
-      // Find which sheet this annexure belongs to and redirect there
       const ref = ann?.ref_code;
       const bsHasRef = bsData?.liabilities.some((r) => r.annexure_ref === ref) || bsData?.assets.some((r) => r.annexure_ref === ref);
       if (bsHasRef) {
@@ -407,6 +454,8 @@ export default function ClientFinancialPage({ params }: { params: Promise<{ clie
       }
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Save failed");
+    } finally {
+      setSavingAnnexureId(null);
     }
   };
 
@@ -446,6 +495,9 @@ export default function ClientFinancialPage({ params }: { params: Promise<{ clie
     setLocalAnnexures((prev) => prev.filter((a) => a.id !== id));
     toast.success(`Annexure ${ref} deleted`);
   };
+
+  // Per-annexure saving state
+  const [savingAnnexureId, setSavingAnnexureId] = useState<number | null>(null);
 
   // Per-sheet save functions
   const [bsSaving, setBsSaving] = useState(false);
@@ -545,21 +597,25 @@ export default function ClientFinancialPage({ params }: { params: Promise<{ clie
 
   // Projection
   const handleProject = async () => {
-    if (!selectedFyId) return;
+    if (!selectedFyId || isProjectingRef.current) return;
     const growth = parseFloat(growthPercent);
     if (isNaN(growth)) { toast.error("Enter valid growth %"); return; }
+    isProjectingRef.current = true;
+    setIsProjecting(true);
     try {
-      // Save current data first
       await saveBs();
       await savePl();
       const newFy = await projectFY(selectedFyId, growth);
       qc.invalidateQueries({ queryKey: ["financial-years", cid] });
       setSelectedFyId(newFy.id);
-      setProjOpen(false);
       setGrowthPercent("");
       toast.success(`FY ${newFy.label} projected with ${growth}% growth`);
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Failed");
+    } finally {
+      isProjectingRef.current = false;
+      setIsProjecting(false);
+      setProjOpen(false);
     }
   };
 
@@ -595,7 +651,7 @@ export default function ClientFinancialPage({ params }: { params: Promise<{ clie
       if (today > fyEnd) reportType = "";
       else if (today >= fyStart && today <= fyEnd) reportType = "ESTIMATED";
       else reportType = "PROJECTED";
-      const doc = ReportDocument({ client, user, fy: selectedFy, bsData, plData, annexures: localAnnexures, annexureMap, reportType });
+      const doc = ReportDocument({ client, user, fy: selectedFy, bsData, plData, annexures: localAnnexures, annexureMap: enrichedAnnexureMap, reportType, netProfit, capitalAccountRef });
       const blob = await pdf(doc).toBlob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -621,9 +677,12 @@ export default function ClientFinancialPage({ params }: { params: Promise<{ clie
       {/* Top bar — simplified */}
       <div className="flex items-center border-b px-4 h-12">
         <div className="flex items-center gap-3">
-          <Link href="/clients" className="text-muted-foreground hover:text-foreground">
+          <button
+            onClick={() => guardedAction(() => router.push("/clients"))}
+            className="text-muted-foreground hover:text-foreground"
+          >
             <ArrowLeft className="h-4 w-4" />
-          </Link>
+          </button>
           <h1 className="text-sm font-semibold">{client.name}</h1>
         </div>
       </div>
@@ -660,7 +719,7 @@ export default function ClientFinancialPage({ params }: { params: Promise<{ clie
                 onAddRow={addBSRow}
                 onRemoveRow={removeBSRow}
                 onPasteRows={pasteBSRows}
-                annexureMap={annexureMap}
+                annexureMap={enrichedAnnexureMap}
               />
             )}
             {tab === "pl" && plData && (
@@ -669,7 +728,7 @@ export default function ClientFinancialPage({ params }: { params: Promise<{ clie
                 onChange={(d) => setPlData(d)}
                 onCreateAnnexure={(id, label) => handleCreateAnnexure(id, label)}
                 onClickAnnexure={handleClickAnnexure}
-                annexureMap={annexureMap}
+                annexureMap={enrichedAnnexureMap}
               />
             )}
             {tab === "annexures" && (
@@ -684,18 +743,22 @@ export default function ClientFinancialPage({ params }: { params: Promise<{ clie
                           annexure={ann}
                           onSave={(id, data) => handleSaveAnnexure(id, data)}
                           onDelete={handleDeleteLocalAnnexure}
+                          isSaving={savingAnnexureId === ann.id}
                         />
                       ) : ann.ann_type === "ledger" ? (
                         <AnnexureLedgerEditor
                           annexure={ann}
                           onSave={(id, data) => handleSaveAnnexure(id, data)}
                           onDelete={handleDeleteLocalAnnexure}
+                          isSaving={savingAnnexureId === ann.id}
+                          netProfit={capitalAccountRef && ann.ref_code === capitalAccountRef ? netProfit : undefined}
                         />
                       ) : (
                         <AnnexureEditor
                           annexure={ann}
                           onSave={(id, data) => handleSaveAnnexure(id, data)}
                           onDelete={handleDeleteLocalAnnexure}
+                          isSaving={savingAnnexureId === ann.id}
                         />
                       )}
                     </div>
@@ -778,7 +841,7 @@ export default function ClientFinancialPage({ params }: { params: Promise<{ clie
         <div className="flex items-center gap-2 px-3">
           {selectedFyId && (
             <>
-              <Button size="sm" variant="outline" onClick={() => setProjOpen(true)} className="h-7 text-xs">
+              <Button size="sm" variant="outline" onClick={() => guardedAction(() => setProjOpen(true))} className="h-7 text-xs">
                 <TrendingUp className="mr-1 h-3 w-3" />Create Projected Reports
               </Button>
               {selectedFy?.source_fy_id && (
@@ -786,7 +849,7 @@ export default function ClientFinancialPage({ params }: { params: Promise<{ clie
                   <TrendingUp className="mr-1 h-3 w-3" />Adjust Growth
                 </Button>
               )}
-              <Button size="sm" variant="outline" onClick={handleExport} disabled={exporting} className="h-7 text-xs">
+              <Button size="sm" variant="outline" onClick={() => guardedAction(handleExport)} disabled={exporting} className="h-7 text-xs">
                 <FileDown className="mr-1 h-3 w-3" />{exporting ? "Exporting..." : "Export Reports"}
               </Button>
             </>
@@ -841,7 +904,9 @@ export default function ClientFinancialPage({ params }: { params: Promise<{ clie
                 </div>
               </div>
             )}
-            <Button className="w-full" onClick={handleProject}>Generate Projected FY</Button>
+            <Button className="w-full" onClick={handleProject} disabled={isProjecting}>
+              {isProjecting ? "Generating..." : "Generate Projected FY"}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>

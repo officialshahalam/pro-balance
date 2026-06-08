@@ -42,8 +42,8 @@ export const sendOtp = async (payload: SignupInput): Promise<{ email: string; me
 	if (!email || !isValidEmail(email)) {
 		throw new ValidationError("A valid email is required");
 	}
-	if (!password || password.length < 6) {
-		throw new ValidationError("Password must be at least 6 characters long");
+	if (!password || password.length < 8) {
+		throw new ValidationError("Password must be at least 8 characters long");
 	}
 
 	const existingUser = await prisma.user.findFirst({
@@ -93,31 +93,24 @@ export const sendOtp = async (payload: SignupInput): Promise<{ email: string; me
 export const verifyOtpAndSignup = async (payload: { email: string; otp: string }): Promise<{ id: number; name: string; email: string; created_at: Date }> => {
 	const email = payload.email?.trim().toLowerCase();
 	const otp = payload.otp?.trim();
-	console.log(`[VERIFY] Input email=${email}, otp=${otp}`);
 
 	if (!email || !isValidEmail(email)) {
 		throw new ValidationError("A valid email is required");
 	}
 	if (!otp || otp.length !== 6) {
-		console.log(`[VERIFY] OTP length check failed: "${otp}" (length=${otp?.length})`);
 		throw new ValidationError("A valid 6-digit OTP is required");
 	}
 
 	const storedOtp = await redis.get(OTP_PREFIX + email);
-	console.log(`[VERIFY] Redis key=${OTP_PREFIX + email}, storedOtp=${storedOtp} (type=${typeof storedOtp}), inputOtp=${otp} (type=${typeof otp})`);
 
 	if (!storedOtp) {
-		console.log("[VERIFY] No OTP found in Redis — expired");
 		throw new ValidationError("OTP expired. Please request a new one.");
 	}
 	if (String(storedOtp) !== otp) {
-		console.log(`[VERIFY] Mismatch: "${String(storedOtp)}" !== "${otp}"`);
 		throw new AuthError("Invalid OTP");
 	}
-	console.log("[VERIFY] OTP matched!");
 
 	const pendingData = await redis.get(PENDING_PREFIX + email);
-	console.log(`[VERIFY] Pending data type=${typeof pendingData}, value=${JSON.stringify(pendingData)?.slice(0, 100)}`);
 
 	if (!pendingData) {
 		throw new ValidationError("Signup session expired. Please start over.");
@@ -125,7 +118,6 @@ export const verifyOtpAndSignup = async (payload: { email: string; otp: string }
 
 	const parsed = typeof pendingData === "string" ? JSON.parse(pendingData) : pendingData;
 	const { name, password_hash } = parsed;
-	console.log(`[VERIFY] Creating user: name=${name}, email=${email}`);
 
 	try {
 		// Double-check no user was created in the meantime
@@ -181,7 +173,7 @@ export const login = async (payload: LoginInput) => {
 		const token = jwt.sign(
 			{ id: user.id },
 			process.env.ACCESS_TOKEN_SECRET!,
-			{ expiresIn: "24h" },
+			{ expiresIn: "24h", algorithm: "HS256" },
 		);
 
 		return {

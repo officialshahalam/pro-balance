@@ -63,6 +63,24 @@ export const createFinancialYear = async (
 				end_date: endDate,
 			},
 		});
+		await prisma.annexure.createMany({
+			data: [
+				{
+					financial_year_id: fy.id,
+					ref_code: "A",
+					title: "Capital Account",
+					ann_type: "ledger",
+					data: { debit: [], credit: [], items: [] },
+				},
+				{
+					financial_year_id: fy.id,
+					ref_code: "B",
+					title: "Fixed Assets",
+					ann_type: "depreciation_schedule",
+					data: { items: [] },
+				},
+			],
+		});
 		return fy;
 	} catch (error) {
 		if (error instanceof AppError) throw error;

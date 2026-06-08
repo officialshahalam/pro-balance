@@ -12,11 +12,12 @@ function fmt(n: number) {
 
 type LedgerItem = { name: string; amount: string };
 
-export default function AnnexureLedgerEditor({ annexure, onSave, onDelete, isSaving }: {
+export default function AnnexureLedgerEditor({ annexure, onSave, onDelete, isSaving, netProfit }: {
   annexure: AnnexureData;
   onSave: (id: number, data: any) => void;
   onDelete: (id: number) => void;
   isSaving?: boolean;
+  netProfit?: number;
 }) {
   const initDebit = (annexure.data?.debit ?? []).map((i: any) => ({ name: i.name, amount: String(i.amount || "") }));
   const initCredit = (annexure.data?.credit ?? []).map((i: any) => ({ name: i.name, amount: String(i.amount || "") }));
@@ -30,8 +31,10 @@ export default function AnnexureLedgerEditor({ annexure, onSave, onDelete, isSav
 
   const debitTotal = debit.reduce((s, i) => s + (parseFloat(i.amount) || 0), 0);
   const creditTotal = credit.reduce((s, i) => s + (parseFloat(i.amount) || 0), 0);
-  const balanceCd = creditTotal - debitTotal;
-  const grandTotal = creditTotal;
+  const npAmt = netProfit ?? 0;
+  const adjustedCreditTotal = creditTotal + npAmt;
+  const balanceCd = adjustedCreditTotal - debitTotal;
+  const grandTotal = adjustedCreditTotal;
 
   const addDebit = () => setDebit((prev) => [...prev, { name: "", amount: "" }]);
   const addCredit = () => setCredit((prev) => [...prev, { name: "", amount: "" }]);
@@ -168,6 +171,17 @@ export default function AnnexureLedgerEditor({ annexure, onSave, onDelete, isSav
                     </Button>
                   </td>
                 </tr>
+                {netProfit !== undefined && (
+                  <tr className="border-b border-border/50">
+                    <td className="py-1 text-xs px-1.5">
+                      By Net {netProfit >= 0 ? "Profit" : "Loss"}
+                    </td>
+                    <td className="py-1 text-right font-mono text-xs w-32">
+                      {fmt(Math.abs(netProfit))}
+                    </td>
+                    <td className="w-6" />
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>

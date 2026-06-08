@@ -26,7 +26,7 @@ const authRouter: ExpressRouter = Router();
  *             properties:
  *               name: { type: string }
  *               email: { type: string, format: email }
- *               password: { type: string, minLength: 6 }
+ *               password: { type: string, minLength: 8 }
  *     responses:
  *       200:
  *         description: OTP sent successfully
@@ -109,13 +109,14 @@ authRouter.post(
 				httpOnly: true,
 				secure: process.env.NODE_ENV === "production",
 				sameSite: "lax",
-				maxAge: 7 * 24 * 60 * 60 * 1000,
+				maxAge: 24 * 60 * 60 * 1000, // match the 24h token expiry
 			});
 
+			// Token is delivered only via the httpOnly cookie, never in the body (XSS hardening).
 			res.status(200).json({
 				status: "success",
 				message: "Login successful",
-				data: { user, token },
+				data: { user },
 			});
 		} catch (error) {
 			next(error);

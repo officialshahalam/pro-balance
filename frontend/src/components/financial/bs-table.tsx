@@ -121,6 +121,9 @@ function BSColumn({ rows, onAmountChange, onLabelChange, onCreateAnnexure, onCli
                 });
               }
 
+              // Closing Stock ("2cs") is a fixed row whose value is read-only, sourced from the P&L.
+              const isClosingStock = row.id === "2cs";
+
               return (
                 <tr key={row.id} className="hover:bg-muted/30">
                   <td className="py-1 text-xs text-muted-foreground">{rowLabel}</td>
@@ -133,7 +136,9 @@ function BSColumn({ rows, onAmountChange, onLabelChange, onCreateAnnexure, onCli
                     )}
                   </td>
                   <td className="py-1 text-center">
-                    {row.annexure_ref ? (
+                    {isClosingStock ? (
+                      <span className="text-xs text-muted-foreground/50">P&amp;L</span>
+                    ) : row.annexure_ref ? (
                       <button onClick={() => onClickAnnexure(row.annexure_ref!)} className="text-xs text-primary cursor-pointer hover:underline">
                         Ann. {row.annexure_ref}
                       </button>
@@ -144,7 +149,9 @@ function BSColumn({ rows, onAmountChange, onLabelChange, onCreateAnnexure, onCli
                     )}
                   </td>
                   <td className="py-1">
-                    {row.annexure_ref ? (
+                    {isClosingStock ? (
+                      <div className="text-right font-mono text-xs text-muted-foreground">{fmt(row.amount ?? 0)}</div>
+                    ) : row.annexure_ref ? (
                       <div className="text-right font-mono text-xs text-muted-foreground">{fmt(displayAmount ?? 0)}</div>
                     ) : (
                       <Input type="number" value={row.amount || ""} onChange={(e) => onAmountChange(row.id, parseFloat(e.target.value) || 0)}
