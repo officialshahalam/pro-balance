@@ -12,7 +12,7 @@ Production topology:
 
 ## 0. Provision the production database (Neon)
 
-1. [Neon console](https://console.neon.tech) → **New Project** (e.g. `probalance-prod`), region near your users (Singapore/Mumbai).
+1. [Neon console](https://console.neon.tech) → **New Project** (e.g. `fine-balance-sheet-prod`), region near your users (Singapore/Mumbai).
 2. Copy the **pooled** connection string — the one containing `-pooler`, with `sslmode=require`. This is your prod `DATABASE_URL`.
 3. The new DB is empty — apply the schema from your machine (uses the committed `prisma/migrations`):
    ```bash
@@ -42,8 +42,8 @@ Keep this prod URL out of your dev `.env`; you'll paste it into Railway next.
    | `FRONTEND_URL` | `https://placeholder` *(updated in step 3)* |
 
    Do **not** set `PORT` — Railway injects it and the app reads `process.env.PORT`.
-4. Deploy. Then **Settings → Networking → Generate Domain**. Note the URL, e.g. `https://probalance-backend-production.up.railway.app`.
-5. Verify: open `https://<backend>/health` → should return `{"message":"ProBalance server is running"}`.
+4. Deploy. Then **Settings → Networking → Generate Domain**. Note the URL, e.g. `https://fine-balance-sheet-backend-production.up.railway.app`.
+5. Verify: open `https://<backend>/health` → should return `{"message":"Fine Balance Sheet server is running"}`.
 
 ---
 
@@ -57,7 +57,7 @@ Keep this prod URL out of your dev `.env`; you'll paste it into Railway next.
    | `NEXT_PUBLIC_API_URL` | `https://<backend>.up.railway.app/api/v1` |
 
    The `/api/v1` suffix is required — the axios client appends route paths to it.
-4. Deploy. Note the URL, e.g. `https://probalance.vercel.app`.
+4. Deploy. Note the URL, e.g. `https://fine-balance-sheet.vercel.app`.
 
 ---
 

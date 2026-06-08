@@ -44,7 +44,7 @@ export default function DashboardLayout({
       <aside className={`flex flex-col border-r bg-muted/30 transition-all duration-200 ${sidebarOpen ? "w-56" : "w-14"}`}>
         <div className={`flex h-12 items-center border-b ${sidebarOpen ? "gap-2 px-4" : "justify-center px-0"}`}>
           <BarChart3 className="h-5 w-5 shrink-0 text-primary" />
-          {sidebarOpen && <span className="text-sm font-semibold">ProBalance</span>}
+          {sidebarOpen && <span className="text-sm font-semibold">Fine Balance Sheet</span>}
         </div>
 
         <nav className="flex-1 space-y-0.5 p-2">

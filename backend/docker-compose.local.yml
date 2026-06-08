@@ -6,22 +6,22 @@ version: "3.8"
 services:
   postgres:
     image: postgres:15
-    container_name: probalance-db
+    container_name: fine-balance-sheet-db
     restart: always
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in backend/.env}
-      POSTGRES_DB: ${POSTGRES_DB:-probalance}
+      POSTGRES_DB: ${POSTGRES_DB:-fine_balance_sheet}
     ports:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     networks:
-      - probalance-net
+      - fine-balance-sheet-net
 
 volumes:
   pgdata:
 
 networks:
-  probalance-net:
+  fine-balance-sheet-net:
     driver: bridge

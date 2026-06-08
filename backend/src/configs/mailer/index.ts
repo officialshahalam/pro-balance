@@ -15,12 +15,12 @@ const transporter = nodemailer.createTransport({
 
 export const sendOtpEmail = async (to: string, otp: string) => {
 	await transporter.sendMail({
-		from: `"ProBalance" <${process.env.SMTP_USER}>`,
+		from: `"Fine Balance Sheet" <${process.env.SMTP_USER}>`,
 		to,
-		subject: "Your ProBalance Verification Code",
+		subject: "Your Fine Balance Sheet Verification Code",
 		html: `
 			<div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; padding: 32px; border: 1px solid #e5e5e5; border-radius: 8px;">
-				<h2 style="margin: 0 0 8px; font-size: 18px; color: #111;">ProBalance</h2>
+				<h2 style="margin: 0 0 8px; font-size: 18px; color: #111;">Fine Balance Sheet</h2>
 				<p style="color: #555; font-size: 14px; margin: 0 0 24px;">Verify your email to create your account.</p>
 				<div style="background: #f5f5f5; border-radius: 6px; padding: 20px; text-align: center; margin-bottom: 24px;">
 					<span style="font-size: 32px; font-weight: bold; letter-spacing: 8px; color: #111;">${otp}</span>

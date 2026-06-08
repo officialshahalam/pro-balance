@@ -6,8 +6,8 @@ version: "3.8"
 
 services:
   app:
-    image: probalance-backend:latest
-    container_name: probalance-app
+    image: fine-balance-sheet-backend:latest
+    container_name: fine-balance-sheet-app
     ports:
       - "4000:4000"
     env_file:
@@ -17,16 +17,16 @@ services:
         condition: service_healthy
     restart: unless-stopped
     networks:
-      - probalance-net
+      - fine-balance-sheet-net
 
   postgres:
     image: postgres:15
-    container_name: probalance-db
+    container_name: fine-balance-sheet-db
     restart: always
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in backend/.env}
-      POSTGRES_DB: ${POSTGRES_DB:-probalance}
+      POSTGRES_DB: ${POSTGRES_DB:-fine_balance_sheet}
     ports:
       - "5432:5432"
     volumes:
@@ -37,11 +37,11 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - probalance-net
+      - fine-balance-sheet-net
 
 volumes:
   pgdata:
 
 networks:
-  probalance-net:
+  fine-balance-sheet-net:
     driver: bridge

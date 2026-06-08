@@ -1,4 +1,4 @@
-# ProBalance
+# Fine Balance Sheet
 
 Financial reporting tool for Indian Chartered Accountants — manage clients, capture financial data, and generate projected/actual Balance Sheet and Profit & Loss reports (with annexures and PDF export).
 

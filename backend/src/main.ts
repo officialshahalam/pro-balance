@@ -84,7 +84,7 @@ const authLimiter = rateLimit({
 });
 
 app.get("/health", (_req: Request, res: Response) => {
-  res.status(200).send({ message: "ProBalance server is running" });
+  res.status(200).send({ message: "Fine Balance Sheet server is running" });
 });
 
 // API docs are not exposed in production.
@@ -93,7 +93,7 @@ if (!isProd) {
     definition: {
       openapi: "3.0.0",
       info: {
-        title: "ProBalance API",
+        title: "Fine Balance Sheet API",
         version: "1.0.0",
         description: "Financial reporting API for Chartered Accountants",
       },

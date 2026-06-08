@@ -37,7 +37,7 @@ export default function LoginPage() {
     <div className="flex h-full items-center justify-center bg-muted/40">
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
-          <CardTitle className="text-xl font-semibold">ProBalance</CardTitle>
+          <CardTitle className="text-xl font-semibold">Fine Balance Sheet</CardTitle>
           <p className="text-sm text-muted-foreground">Sign in to your account</p>
         </CardHeader>
         <CardContent>
